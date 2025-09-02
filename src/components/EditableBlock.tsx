@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { renderDiscordMarkdown } from '../utils/markdown';
 
-interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; }
+interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; }
 
-export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl }) => {
+export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl, disableLinkNavigation, suppressLinkStyle }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
+  const wrapperRef = useRef<HTMLDivElement|null>(null);
 
   useEffect(() => { if(editing && ref.current) ref.current.focus(); }, [editing]);
   useEffect(() => { setDraft(value || ''); }, [value]);
@@ -60,12 +61,24 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
 
   const remaining = charLimit? (draft.length + '/' + charLimit) : undefined;
 
+  // Guardar automáticamente al hacer clic fuera
+  useEffect(()=>{
+    if(!editing) return;
+    function outside(e: MouseEvent){
+      if(wrapperRef.current && !wrapperRef.current.contains(e.target as Node)){
+        finish(true);
+      }
+    }
+    document.addEventListener('mousedown', outside);
+    return ()=>document.removeEventListener('mousedown', outside);
+  }, [editing, draft]);
+
   if(editing) {
     if(multiline) {
       const longest = draft.split('\n').reduce((m,l)=>Math.max(m,l.length),0);
       const estWidth = Math.min(375, Math.max(120, longest * 7.2 + 24));
       return (
-      <div className="editable-wrapper" style={{position:'relative'}}>
+  <div className="editable-wrapper" style={{position:'relative'}} ref={wrapperRef}>
         <textarea className="auto-resize" style={{width: estWidth}} ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
         {remaining && (
           <div style={{position:'absolute',top:-10,right:0,background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,fontSize:11}} aria-hidden="true">
@@ -75,7 +88,7 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
       </div>
     ); }
     return (
-      <div className="editable-wrapper" style={{position:'relative'}}>
+  <div className="editable-wrapper" style={{position:'relative'}} ref={wrapperRef}>
         <input ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
         {remaining && (
           <div style={{position:'absolute',top:-10,right:0,background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,fontSize:11}} aria-hidden="true">
@@ -106,9 +119,24 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     }
   }
   const content = value? <div className="editable" dangerouslySetInnerHTML={{__html: html}} /> : <span style={{opacity:.4}}>{placeholder}</span>;
+  function handleLinkClick(e: React.MouseEvent){
+    if(disableLinkNavigation && !(e.metaKey||e.ctrlKey)){
+      e.preventDefault();
+    }
+  }
+  function handleActivate(e: React.MouseEvent){
+    handleClick(e);
+    if(!editing){
+      // Evitar apertura de popup padre
+      e.stopPropagation();
+      setEditing(true);
+    }
+  }
   return (
-    <div className="editable-block" onClick={handleClick} onDoubleClick={()=>setEditing(true)} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
-      {linkUrl && value? <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block-link">{content}</a>: content}
+    <div className="editable-block" onClick={handleActivate} onDoubleClick={(e)=>{ e.stopPropagation(); if(!editing) setEditing(true); }} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
+      {linkUrl && value? (
+        <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={"block-link" + (suppressLinkStyle? ' no-color':'')} onClick={handleLinkClick}>{content}</a>
+      ): content}
     </div>
   );
 };

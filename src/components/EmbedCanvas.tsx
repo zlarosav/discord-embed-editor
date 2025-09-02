@@ -62,7 +62,7 @@ export const EmbedCanvas: React.FC = () => {
                 <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('author'); }}>✕</button>
                 <div className="embed-author">
                   {embed.author.icon_url && <img src={embed.author.icon_url} alt="author" />}
-                  <EditableBlock value={embed.author?.name} linkUrl={embed.author?.url} onChange={v=>update({ author: { ...(embed.author||{}), name: v } })} placeholder="Author name" charLimit={256} />
+                  <EditableBlock value={embed.author?.name} linkUrl={embed.author?.url} onChange={v=>update({ author: { ...(embed.author||{}), name: v } })} placeholder="Author name" charLimit={256} disableLinkNavigation suppressLinkStyle />
                 </div>
               </div>
             )}
@@ -70,7 +70,7 @@ export const EmbedCanvas: React.FC = () => {
               <div className="block-wrapper" style={embed.title && embed.title.length>256? {borderColor:'#ff5f56'}: undefined} onClick={(e)=>{ if((e.target as HTMLElement).closest('.editable, .editable-block')) return; setPopup('title'); }}>
                 <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('title'); }}>✕</button>
                 <div className="embed-title">
-                  <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} />
+                  <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation />
                 </div>
               </div>
             )}

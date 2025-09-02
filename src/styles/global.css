@@ -20,6 +20,11 @@
 .embed-title{font-weight:600;font-size:16px;}
 .embed-title a,.block-link{color:#5dbbff;text-decoration:none;}
 .embed-title a:hover,.block-link:hover{color:#8ed3ff;}
+/* Variante sin cambio de color (para Author con URL) */
+.block-link.no-color{color:inherit;}
+.block-link.no-color:hover{color:inherit;}
+body.light .block-link.no-color{color:inherit;}
+body.light .block-link.no-color:hover{color:inherit;}
 .embed-inner a{color:#5dbbff;text-decoration:none;}
 .embed-author{display:flex;align-items:center;gap:8px;font-weight:500;font-size:13px;}
 .embed-author img{width:24px;height:24px;border-radius:50%;object-fit:cover;}
