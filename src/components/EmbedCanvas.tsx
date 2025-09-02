@@ -58,19 +58,21 @@ export const EmbedCanvas: React.FC = () => {
         <div className="embed-layout-row">
           <div className="embed-body">
             {embed.author && (
-              <div className="block-wrapper" style={embed.author?.name && embed.author.name.length>256? {borderColor:'#ff5f56'}: undefined} onClick={(e)=>{ if((e.target as HTMLElement).closest('.editable, .editable-block')) return; setPopup('author'); }}>
+              <div className="block-wrapper" style={embed.author?.name && embed.author.name.length>256? {borderColor:'#ff5f56'}: undefined}>
                 <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('author'); }}>✕</button>
+                <button className="block-remove block-link-edit" style={{right:30}} title="Editar enlace/icono" onClick={(e)=>{ e.stopPropagation(); setPopup('author'); }}>🔗</button>
                 <div className="embed-author">
                   {embed.author.icon_url && <img src={embed.author.icon_url} alt="author" />}
-                  <EditableBlock value={embed.author?.name} linkUrl={embed.author?.url} onChange={v=>update({ author: { ...(embed.author||{}), name: v } })} placeholder="Author name" charLimit={256} disableLinkNavigation suppressLinkStyle />
+                  <EditableBlock value={embed.author?.name} linkUrl={embed.author?.url} onChange={v=>update({ author: { ...(embed.author||{}), name: v } })} placeholder="Author name" charLimit={256} disableLinkNavigation suppressLinkStyle editOnSingleClick />
                 </div>
               </div>
             )}
             {embed.title !== undefined && (
-              <div className="block-wrapper" style={embed.title && embed.title.length>256? {borderColor:'#ff5f56'}: undefined} onClick={(e)=>{ if((e.target as HTMLElement).closest('.editable, .editable-block')) return; setPopup('title'); }}>
+              <div className="block-wrapper" style={embed.title && embed.title.length>256? {borderColor:'#ff5f56'}: undefined}>
                 <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('title'); }}>✕</button>
+                <button className="block-remove block-link-edit" style={{right:30}} title="Editar enlace" onClick={(e)=>{ e.stopPropagation(); setPopup('title'); }}>🔗</button>
                 <div className="embed-title">
-                  <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation />
+                  <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation editOnSingleClick />
                 </div>
               </div>
             )}
@@ -100,11 +102,12 @@ export const EmbedCanvas: React.FC = () => {
           </div>
         )}
         {embed.footer && (
-          <div className="block-wrapper" style={embed.footer?.text && embed.footer.text.length>2048? {borderColor:'#ff5f56'}: undefined} onClick={(e)=>{ if((e.target as HTMLElement).closest('.editable, .editable-block')) return; setPopup('footer'); }}>
+          <div className="block-wrapper" style={embed.footer?.text && embed.footer.text.length>2048? {borderColor:'#ff5f56'}: undefined}>
             <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('footer'); }}>✕</button>
+            <button className="block-remove block-link-edit" style={{right:30}} title="Editar icono" onClick={(e)=>{ e.stopPropagation(); setPopup('footer'); }}>🔗</button>
             <div className="embed-footer">
               {embed.footer.icon_url && <img src={embed.footer.icon_url} alt="footer icon" />}
-              <EditableBlock value={embed.footer?.text} onChange={v=>update({ footer: { ...(embed.footer||{}), text: v } })} placeholder="Footer" charLimit={2048} />
+              <EditableBlock value={embed.footer?.text} onChange={v=>update({ footer: { ...(embed.footer||{}), text: v } })} placeholder="Footer" charLimit={2048} editOnSingleClick />
               {embed.timestamp && <span onClick={(e)=>{ e.stopPropagation(); setPopup('timestamp'); }} style={{cursor:'pointer'}} title="Editar timestamp">• {new Date(embed.timestamp).toLocaleDateString([], {day:'2-digit', month:'2-digit', year:'numeric'})}</span>}
               {embed.timestamp && <button className="block-remove" style={{position:'static'}} onClick={()=>remove('timestamp')}>✕</button>}
             </div>

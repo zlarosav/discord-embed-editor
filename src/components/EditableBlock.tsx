@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { renderDiscordMarkdown } from '../utils/markdown';
 
-interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; }
+interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; editOnSingleClick?: boolean; }
 
-export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl, disableLinkNavigation, suppressLinkStyle }) => {
+export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl, disableLinkNavigation, suppressLinkStyle, editOnSingleClick }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
   const wrapperRef = useRef<HTMLDivElement|null>(null);
+  const blockRef = useRef<HTMLDivElement|null>(null);
 
   useEffect(() => { if(editing && ref.current) ref.current.focus(); }, [editing]);
   useEffect(() => { setDraft(value || ''); }, [value]);
@@ -73,6 +74,15 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     return ()=>document.removeEventListener('mousedown', outside);
   }, [editing, draft]);
 
+  // Cuando se cierra la edición, mantener el flag un breve tiempo para evitar que el clic que cierra abra popup
+  useEffect(()=>{
+    if(!editOnSingleClick) return;
+    if(!editing && blockRef.current && blockRef.current.getAttribute('data-just-activated')==='true'){
+      const t = setTimeout(()=>{ blockRef.current && blockRef.current.removeAttribute('data-just-activated'); }, 450);
+      return ()=>clearTimeout(t);
+    }
+  }, [editing, editOnSingleClick]);
+
   if(editing) {
     if(multiline) {
       const longest = draft.split('\n').reduce((m,l)=>Math.max(m,l.length),0);
@@ -125,12 +135,17 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     }
   }
   function handleSingle(e: React.MouseEvent){
-    // Consumir el clic para que el contenedor no abra popup, pero no entrar en modo edición todavía
-    e.stopPropagation();
     handleClick(e);
+    if(editOnSingleClick && !editing){
+      e.stopPropagation();
+      setEditing(true);
+      const el = (e.currentTarget as HTMLElement);
+      el.setAttribute('data-just-activated','true');
+      // Removemos después de que la edición se cierre (ver effect abajo)
+    }
   }
   return (
-    <div className="editable-block" onClick={handleSingle} onDoubleClick={(e)=>{ e.stopPropagation(); if(!editing) setEditing(true); }} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
+  <div ref={blockRef} className="editable-block" data-editing={editing? 'true': 'false'} onClick={handleSingle} onDoubleClick={(e)=>{ if(editOnSingleClick){ /* dejar burbujear para popup */ return; } e.stopPropagation(); if(!editing) setEditing(true); }} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
       {linkUrl && value? (
         <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={"block-link" + (suppressLinkStyle? ' no-color':'')} onClick={handleLinkClick}>{content}</a>
       ): content}

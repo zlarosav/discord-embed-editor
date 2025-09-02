@@ -66,6 +66,9 @@ body.light textarea.auto-resize::-webkit-scrollbar-track{background:#ffffff;}
 .block-wrapper:hover{border-color:#5865f2;}
 .block-remove{position:absolute;top:2px;right:2px;background:#1f2023;border:1px solid #3a3c42;border-radius:4px;padding:2px 5px;font-size:11px;display:none;cursor:pointer;color:#ccc;}
 .block-wrapper:hover .block-remove{display:block;}
+.block-link-edit{font-size:11px;padding:2px 6px;}
+.block-link-edit{display:none;}
+.block-wrapper:hover .block-link-edit{display:block;}
 .desc-block .block-remove{top:-10px;right:-6px;}
 .desc-counter-overlay{position:absolute;top:-10px;right:34px;background:rgba(0,0,0,.45);padding:2px 6px;border-radius:4px;font-size:11px;opacity:0;transition:opacity .15s;}
 .desc-block:hover .desc-counter-overlay{opacity:1;}
