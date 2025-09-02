@@ -200,6 +200,8 @@ body:has(.property-popup){overflow:hidden;}
 .mention-token:focus-within button.mention-remove,.mention-token:hover button.mention-remove{opacity:1;}
 .editable-wrapper .editing-hint{position:absolute;bottom:-2px;right:0;display:flex;gap:8px;font-size:10px;opacity:0;transform:translateY(100%);padding:2px 4px;background:rgba(0,0,0,.4);border-radius:4px;pointer-events:none;}
 .editable-wrapper:hover .editing-hint,.editable-wrapper:focus-within .editing-hint{opacity:1;}
+/* Ajuste: la envoltura editable debe encoger al ancho del campo para que el contador se alinee al borde del input y no de la card */
+.editable-wrapper{display:inline-block;position:relative;max-width:100%;}
 
 /* Focus accesible */
 *:focus-visible{outline:2px solid #5865f2;outline-offset:2px;}

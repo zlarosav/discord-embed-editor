@@ -99,23 +99,35 @@ export const PropertyPopup: React.FC<Props> = ({ type, embed, onUpdate, onClose,
   if(type==='timestamp'){
     title = 'Timestamp';
     const iso = embed.timestamp || new Date().toISOString();
-    const localVal = iso.slice(0,16); // YYYY-MM-DDTHH:MM
+    // Estado local para evitar commits en cada tecla y sólo aplicar cuando el valor es válido completo
+    const [localValue, setLocalValue] = React.useState<string>(() => iso.slice(0,16)); // YYYY-MM-DDTHH:MM
+    useEffect(()=>{
+      // Si cambia desde fuera (ej: botón Ahora o Quitar) sincronizar
+      if(embed.timestamp){
+        const next = embed.timestamp.slice(0,16);
+        setLocalValue(next);
+      } else {
+        setLocalValue('');
+      }
+    },[embed.timestamp]);
+    function commitIfValid(v: string){
+      if(!v){ onUpdate({ timestamp: undefined }); return; }
+      // Validar formato mínimo completo
+      if(v.length===16){
+        const dt = new Date(v);
+        if(!isNaN(dt.getTime())){
+          onUpdate({ timestamp: dt.toISOString() });
+        }
+      }
+    }
     body = (
       <div className="popup-grid">
         <label>Fecha y hora
-          <input type="datetime-local" value={localVal} onChange={e=>{
-            const v = e.target.value; // local time
-            if(v){
-              const dt = new Date(v);
-              onUpdate({ timestamp: dt.toISOString() });
-            } else {
-              onUpdate({ timestamp: undefined });
-            }
-          }} />
+          <input type="datetime-local" value={localValue} onChange={e=>{ setLocalValue(e.target.value); }} onBlur={()=>commitIfValid(localValue)} />
         </label>
         <div style={{display:'flex',gap:8}}>
-          <button type="button" className="popup-btn" onClick={()=>onUpdate({ timestamp: new Date().toISOString() })}>Ahora</button>
-          {embed.timestamp && <button type="button" className="popup-btn danger" onClick={()=>onUpdate({ timestamp: undefined })}>Quitar</button>}
+          <button type="button" className="popup-btn" onClick={()=>{ const now = new Date().toISOString(); onUpdate({ timestamp: now }); }}>Ahora</button>
+          {embed.timestamp && <button type="button" className="popup-btn danger" onClick={()=>{ onUpdate({ timestamp: undefined }); }}>Quitar</button>}
         </div>
       </div>
     );

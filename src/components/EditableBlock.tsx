@@ -107,7 +107,7 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
   }
   const content = value? <div className="editable" dangerouslySetInnerHTML={{__html: html}} /> : <span style={{opacity:.4}}>{placeholder}</span>;
   return (
-    <div onClick={handleClick} onDoubleClick={()=>setEditing(true)} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
+    <div className="editable-block" onClick={handleClick} onDoubleClick={()=>setEditing(true)} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
       {linkUrl && value? <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="block-link">{content}</a>: content}
     </div>
   );
