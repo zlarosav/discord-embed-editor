@@ -124,16 +124,13 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
       e.preventDefault();
     }
   }
-  function handleActivate(e: React.MouseEvent){
+  function handleSingle(e: React.MouseEvent){
+    // Consumir el clic para que el contenedor no abra popup, pero no entrar en modo edición todavía
+    e.stopPropagation();
     handleClick(e);
-    if(!editing){
-      // Evitar apertura de popup padre
-      e.stopPropagation();
-      setEditing(true);
-    }
   }
   return (
-    <div className="editable-block" onClick={handleActivate} onDoubleClick={(e)=>{ e.stopPropagation(); if(!editing) setEditing(true); }} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
+    <div className="editable-block" onClick={handleSingle} onDoubleClick={(e)=>{ e.stopPropagation(); if(!editing) setEditing(true); }} tabIndex={0} role="textbox" aria-label={placeholder} style={{cursor:'text'}}>
       {linkUrl && value? (
         <a href={linkUrl} target="_blank" rel="noopener noreferrer" className={"block-link" + (suppressLinkStyle? ' no-color':'')} onClick={handleLinkClick}>{content}</a>
       ): content}
