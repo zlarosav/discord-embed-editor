@@ -1,0 +1,10 @@
+{
+  "embeds": [
+    {
+      "title": "Media",
+      "description": "Imagen y thumbnail",
+      "thumbnail": {"url":"https://example.com/thumb.png"},
+      "image": {"url":"https://example.com/image.png"}
+    }
+  ]
+}

@@ -1,0 +1,8 @@
+{
+  "embeds": [
+    {
+      "title": "Markdown avanzado",
+      "description": "**Bold** *Italic* __Underline__ ~~Strike~~ `code`\n```js\nconsole.log('code block');\n```\n> quote\n[link](https://example.com) \n||spoiler||"
+    }
+  ]
+}

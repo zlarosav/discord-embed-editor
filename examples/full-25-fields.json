@@ -1,0 +1,19 @@
+{
+  "embeds": [
+    {
+      "title": "25 fields test",
+      "description": "Probando límite de 25 fields",
+      "fields": [
+        {"name":"F1","value":"V","inline":true}, {"name":"F2","value":"V","inline":true}, {"name":"F3","value":"V","inline":true},
+        {"name":"F4","value":"V","inline":true}, {"name":"F5","value":"V","inline":true}, {"name":"F6","value":"V","inline":true},
+        {"name":"F7","value":"V","inline":true}, {"name":"F8","value":"V","inline":true}, {"name":"F9","value":"V","inline":true},
+        {"name":"F10","value":"V","inline":true}, {"name":"F11","value":"V","inline":true}, {"name":"F12","value":"V","inline":true},
+        {"name":"F13","value":"V","inline":true}, {"name":"F14","value":"V","inline":true}, {"name":"F15","value":"V","inline":true},
+        {"name":"F16","value":"V","inline":true}, {"name":"F17","value":"V","inline":true}, {"name":"F18","value":"V","inline":true},
+        {"name":"F19","value":"V","inline":true}, {"name":"F20","value":"V","inline":true}, {"name":"F21","value":"V","inline":true},
+        {"name":"F22","value":"V","inline":true}, {"name":"F23","value":"V","inline":true}, {"name":"F24","value":"V","inline":true},
+        {"name":"F25","value":"V","inline":true}
+      ]
+    }
+  ]
+}
