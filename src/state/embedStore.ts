@@ -103,10 +103,43 @@ export const useEmbedStore = create<EmbedState>((set, get) => ({
   updateEmbed: (patch: Partial<EmbedData>) => set((s: EmbedState) => ({ embed: { ...s.embed, ...patch } })),
   reset: () => set({ embed: sampleResetEmbed() }),
   importJSON: (data: any) => {
-    if(data?.embeds?.[0]) {
-      const e = data.embeds[0];
-  set({ embed: { ...emptyEmbed, ...e, fields: (e.fields||[]).map((f: any) => ({ id: generateId(), ...f })) } });
-    }
+    // Aceptar tanto { embeds:[embed] } como un objeto embed directo
+    const raw = data?.embeds?.[0] && typeof data.embeds[0] === 'object'
+      ? data.embeds[0]
+      : (data && typeof data === 'object' && !Array.isArray(data) ? data : null);
+  if(!raw) { return; }
+    // Construcción estricta: sólo lo que viene en el JSON (sin fusionar plantilla),
+    // generando nuevos ids de fields y aplicando defaults mínimos.
+    const next: EmbedData = {
+      fields: Array.isArray(raw.fields)? raw.fields.map((f: any) => ({
+        id: generateId(),
+        name: typeof f.name === 'string'? f.name : '',
+        value: typeof f.value === 'string'? f.value : '',
+        inline: !!f.inline
+      })) : [],
+      ...(typeof raw.title === 'string'? { title: raw.title }: {}),
+      ...(typeof raw.description === 'string'? { description: raw.description }: {}),
+      ...(typeof raw.url === 'string'? { url: raw.url }: {}),
+      ...(typeof raw.timestamp === 'string'? { timestamp: raw.timestamp }: {}),
+      ...(typeof raw.color === 'number'? { color: raw.color }: {}),
+      ...(raw.footer && typeof raw.footer === 'object'? { footer: {
+        ...(typeof raw.footer.text === 'string'? { text: raw.footer.text }: {}),
+        ...(typeof raw.footer.icon_url === 'string'? { icon_url: raw.footer.icon_url }: {})
+      }}: {}),
+      ...(raw.author && typeof raw.author === 'object'? { author: {
+        ...(typeof raw.author.name === 'string'? { name: raw.author.name }: {}),
+        ...(typeof raw.author.url === 'string'? { url: raw.author.url }: {}),
+        ...(typeof raw.author.icon_url === 'string'? { icon_url: raw.author.icon_url }: {})
+      }}: {}),
+      ...(raw.thumbnail && typeof raw.thumbnail === 'object'? { thumbnail: {
+        ...(typeof raw.thumbnail.url === 'string'? { url: raw.thumbnail.url }: {})
+      }}: {}),
+      ...(raw.image && typeof raw.image === 'object'? { image: {
+        ...(typeof raw.image.url === 'string'? { url: raw.image.url }: {})
+      }}: {}),
+    };
+  try { localStorage.removeItem('embed_state'); } catch {}
+  set({ embed: next });
   },
   exportJSON: () => ({ embeds: [ get().embed ] })
 }));

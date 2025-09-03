@@ -9,7 +9,63 @@ interface Props {
   onClose: () => void;
 }
 
-export const PropertyPopup: React.FC<Props> = ({ type, embed, onUpdate, onClose, avatarPresets }) => {
+const CONFIG: Record<string, { title: string; render: (p: { embed: EmbedData; onUpdate: (patch: Partial<EmbedData>)=>void; type: Props['type']; }) => React.ReactNode }> = {
+  title: {
+    title: 'Título',
+    render: ({ embed, onUpdate }) => (
+      <div className="popup-grid">
+        <label>URL
+          <input value={embed.url||''} onChange={e=>onUpdate({ url: e.target.value||undefined })} placeholder="https://..." />
+        </label>
+      </div>
+    )
+  },
+  author: {
+    title: 'Author',
+    render: ({ embed, onUpdate }) => (
+      <div className="popup-grid">
+        <label>URL (enlace)
+          <input value={embed.author?.url||''} onChange={e=>onUpdate({ author: { ...(embed.author||{}), url: e.target.value||undefined } })} placeholder="https://..." />
+        </label>
+        <label>Icon URL
+          <input value={embed.author?.icon_url||''} onChange={e=>onUpdate({ author: { ...(embed.author||{}), icon_url: e.target.value||undefined } })} placeholder="https://..." />
+        </label>
+      </div>
+    )
+  },
+  footer: {
+    title: 'Footer',
+    render: ({ embed, onUpdate }) => (
+      <div className="popup-grid">
+        <label>Icon URL
+          <input value={embed.footer?.icon_url||''} onChange={e=>onUpdate({ footer: { ...(embed.footer||{}), icon_url: e.target.value||undefined } })} placeholder="https://..." />
+        </label>
+      </div>
+    )
+  },
+  image: {
+    title: 'Image',
+    render: ({ embed, onUpdate }) => (
+      <div className="popup-grid">
+        <label>URL
+          <input value={embed.image?.url||''} onChange={e=>onUpdate({ image: { url: e.target.value } })} placeholder="https://..." />
+        </label>
+      </div>
+    )
+  },
+  thumbnail: {
+    title: 'Thumbnail',
+    render: ({ embed, onUpdate }) => (
+      <div className="popup-grid">
+        <label>URL
+          <input value={embed.thumbnail?.url||''} onChange={e=>onUpdate({ thumbnail: { url: e.target.value } })} placeholder="https://..." />
+        </label>
+      </div>
+    )
+  }
+};
+
+export const PropertyPopup: React.FC<Props> = ({ type, embed, onUpdate, onClose }) => {
   const ref = useRef<HTMLDivElement|null>(null);
   const [closing,setClosing] = React.useState(false);
   function requestClose(){
@@ -42,60 +98,6 @@ export const PropertyPopup: React.FC<Props> = ({ type, embed, onUpdate, onClose,
 
   let title = '';
   let body: React.ReactNode = null;
-
-  if(type==='title'){
-    title = 'Título';
-    body = (
-      <div className="popup-grid">
-        <label>URL
-          <input value={embed.url||''} onChange={e=>onUpdate({ url: e.target.value||undefined })} placeholder="https://..." />
-        </label>
-      </div>
-    );
-  }
-  if(type==='author'){
-    title = 'Author';
-    body = (
-      <div className="popup-grid">
-        <label>URL (enlace)
-          <input value={embed.author?.url||''} onChange={e=>onUpdate({ author: { ...(embed.author||{}), url: e.target.value||undefined } })} placeholder="https://..." />
-        </label>
-        <label>Icon URL
-          <input value={embed.author?.icon_url||''} onChange={e=>onUpdate({ author: { ...(embed.author||{}), icon_url: e.target.value||undefined } })} placeholder="https://..." />
-        </label>
-      </div>
-    );
-  }
-  if(type==='footer'){
-    title = 'Footer';
-    body = (
-      <div className="popup-grid">
-        <label>Icon URL
-          <input value={embed.footer?.icon_url||''} onChange={e=>onUpdate({ footer: { ...(embed.footer||{}), icon_url: e.target.value||undefined } })} placeholder="https://..." />
-        </label>
-      </div>
-    );
-  }
-  if(type==='image'){
-    title = 'Image';
-    body = (
-      <div className="popup-grid">
-        <label>URL
-          <input value={embed.image?.url||''} onChange={e=>onUpdate({ image: { url: e.target.value } })} placeholder="https://..." />
-        </label>
-      </div>
-    );
-  }
-  if(type==='thumbnail'){
-    title = 'Thumbnail';
-    body = (
-      <div className="popup-grid">
-        <label>URL
-          <input value={embed.thumbnail?.url||''} onChange={e=>onUpdate({ thumbnail: { url: e.target.value } })} placeholder="https://..." />
-        </label>
-      </div>
-    );
-  }
   if(type==='timestamp'){
     title = 'Timestamp';
     const iso = embed.timestamp || new Date().toISOString();
@@ -131,6 +133,9 @@ export const PropertyPopup: React.FC<Props> = ({ type, embed, onUpdate, onClose,
         </div>
       </div>
     );
+  } else if(CONFIG[type]){
+    title = CONFIG[type].title;
+    body = CONFIG[type].render({ embed, onUpdate, type });
   }
 
   return (

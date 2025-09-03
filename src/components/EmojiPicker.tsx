@@ -1,16 +1,18 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import fullSet from '../data/emojis-full.json';
 import twemoji from '@twemoji/api';
+import { useOutsideClick } from '../hooks/useOutsideClick';
+import { usePersistentState } from '../hooks/usePersistentState';
 
 interface DiversityVariant { tone:number; char:string; names?:string[]; codepoints?:string }
 interface EmojiEntry { name: string; char: string; names?: string[]; codepoints?:string; hasDiversity?: boolean; diversity?: DiversityVariant[] }
 interface Category { key: string; label: string; emojis: EmojiEntry[] }
-const CATEGORIES: Category[] = (fullSet as any).categories;
 
 interface EmojiPickerProps { onSelect: (shortcode: string) => void; anchorRef?: React.RefObject<HTMLElement>; onClose?: () => void; }
 
 export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, onClose }) => {
   const [query,setQuery] = useState('');
+  const [categories, setCategories] = useState<Category[]>([]);
+  const [loading, setLoading] = useState(true);
   const ref = useRef<HTMLDivElement|null>(null);
   const [hoverEmoji,setHoverEmoji] = useState<EmojiEntry|null>(null);
   const [recent,setRecent] = useState<string[]>(()=>{
@@ -18,13 +20,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
     return [];
   });
   // Cerrar con click fuera
-  useEffect(()=>{
-    function outside(e: MouseEvent){ if(ref.current && !ref.current.contains(e.target as Node) && !anchorRef?.current?.contains(e.target as Node)){ onClose?.(); } }
-    function esc(e: KeyboardEvent){ if(e.key==='Escape'){ onClose?.(); } }
-    document.addEventListener('mousedown', outside);
-    document.addEventListener('keydown', esc);
-    return ()=>{ document.removeEventListener('mousedown', outside); document.removeEventListener('keydown', esc); };
-  }, [onClose, anchorRef]);
+  useOutsideClick(ref, ()=>onClose?.(), { include: anchorRef? [anchorRef]: [], onEscape: true });
   // Posicionamiento dentro de viewport (ajustar si se sale por derecha / abajo)
   useEffect(()=>{
     const el = ref.current; if(!el) return;
@@ -35,11 +31,28 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
     if(rect.bottom > vh) dy = vh - rect.bottom - 8;
     if(dx||dy){ el.style.transform = `translate(${dx}px,${dy}px)`; }
   }, []);
-  const [tab,setTab] = useState(CATEGORIES[0]?.key);
-  const [tone,setTone] = useState<number>(0); // 0=default, 1..5
+  const [tab,setTab] = usePersistentState<string>('emoji_tab', 'people');
+  const [tone,setTone] = usePersistentState<number>('emoji_tone', 0); // 0=default, 1..5
+
+  // Lazy load del dataset grande
+  useEffect(()=>{
+    let active = true;
+    (async () => {
+      try {
+        const mod: any = await import('../data/emojis-full.json');
+        if(!active) return;
+        const cats: Category[] = mod.categories || [];
+        setCategories(cats);
+      } finally {
+        if(active) setLoading(false);
+      }
+    })();
+    return ()=>{ active = false; };
+  }, []);
   const filtered = useMemo(()=>{
+  if(loading) return [] as Category[];
   const q = query.toLowerCase();
-  let cats = CATEGORIES.map(cat=> ({
+  let cats = categories.map(cat=> ({
       ...cat,
       emojis: cat.emojis.filter(e=> {
         if(!q) return true;
@@ -52,7 +65,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
   const recentSet = new Set(recent);
   const recEmojis: EmojiEntry[] = [];
       for(const r of recent){
-    for(const c of CATEGORIES){ const found = c.emojis.find(e=>e.name===r); if(found){ recEmojis.push(found); break; } }
+        for(const c of categories){ const found = c.emojis.find((e:EmojiEntry)=>e.name===r); if(found){ recEmojis.push(found); break; } }
       }
       if(recEmojis.length){
         cats = [{ key:'recent', label:'Recientes', emojis: recEmojis }, ...cats];
@@ -70,7 +83,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
       }));
     }
     return cats;
-  }, [query, tab, recent, tone]);
+  }, [query, tab, recent, tone, categories, loading]);
   // SVG íconos estilo Discord (frequently used + 8 categorías). Se mapean a las keys del dataset.
   const CAT_SVGS: Record<string, JSX.Element> = {
     recent: (
@@ -132,12 +145,13 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
   return (
     <div ref={ref} className="emoji-picker" role="dialog" aria-label="Emoji picker">
       <div className="emoji-tabs-row">
-        {CATEGORIES.map(c=> (
+        {categories.map(c=> (
           <button key={c.key} type="button" className="emoji-tab" onClick={()=>{ setTab(c.key); setQuery(''); }} aria-pressed={tab===c.key} title={c.label}>
             <span className="cat-svg">{CAT_SVGS[c.key] || '❓'}</span>
           </button>
         ))}
       </div>
+      {loading && <div style={{padding:8,fontSize:12,opacity:.7}}>Cargando emojis…</div>}
       <input className="emoji-search" placeholder="Buscar" value={query} onChange={e=>setQuery(e.target.value)} />
       <div style={{display:'flex',alignItems:'center',gap:6}}>
         {[0,1,2,3,4,5].map(t=> (
@@ -153,7 +167,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
         ))}
       </div>
   <div className="emoji-cat-wrapper" style={{maxHeight:320,overflow:'auto',display:'flex',flexDirection:'column',gap:8}}>
-        {filtered.map(cat => {
+  {filtered.map(cat => {
           // Deduplicar por carácter, preferir el último (alias duplicado añadido por build) para mostrar alias en vez de nombre CLDR.
           const dedup: EmojiEntry[] = [];
           const indexByChar = new Map<string, number>();
@@ -198,7 +212,7 @@ export const EmojiPicker: React.FC<EmojiPickerProps> = ({ onSelect, anchorRef, o
           );
         })}
       </div>
-      <div className="emoji-preview" aria-live="polite">
+  <div className="emoji-preview" aria-live="polite">
         {hoverEmoji ? (
           <div className="emoji-preview-inner">
             {(() => { const list = hoverEmoji.names && hoverEmoji.names.length ? hoverEmoji.names : [hoverEmoji.name]; const primary=list[0]; return <>

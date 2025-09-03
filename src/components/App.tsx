@@ -7,6 +7,7 @@ import { HistoryPanel, pushHistory } from './HistoryPanel';
 import { ExportModal } from './ExportModal';
 import { validateEmbed } from '../utils/validation';
 import { toDiscordPayload } from '../utils/toDiscordPayload';
+import { isExportPayload, explainInvalid } from '../utils/isExportPayload';
 
 export const App: React.FC = () => {
   const embed = useEmbedStore((s: EmbedStoreState)=>s.embed);
@@ -17,6 +18,13 @@ export const App: React.FC = () => {
   const [showExport, setShowExport] = React.useState(false);
   const validation = validateEmbed(embed);
   const [theme,setTheme] = React.useState<'dark'|'light'>(()=> (localStorage.getItem('app_theme') as 'dark'|'light') || 'dark');
+  const [importStatus, setImportStatus] = React.useState<{ type: 'ok'|'err'; msg: string }|null>(null);
+  React.useEffect(()=>{
+    if(importStatus?.type==='ok'){
+      const t = setTimeout(()=> setImportStatus(null), 3000);
+      return ()=> clearTimeout(t);
+    }
+  },[importStatus]);
 
   React.useEffect(()=>{
     document.body.classList.toggle('light', theme==='light');
@@ -37,11 +45,27 @@ export const App: React.FC = () => {
 
   function handleImport(e: React.ChangeEvent<HTMLInputElement>){
     const file = e.target.files?.[0]; if(!file) return;
-    file.text().then(t => { try{ 
-      // Guardar embed actual antes de reemplazar
-      if(embed) pushHistory(embed);
-      importJSON(JSON.parse(t)); 
-    } catch{ alert('JSON inválido'); } });
+    file.text().then(t => { 
+      let parsed: any;
+      try { parsed = JSON.parse(t); } catch (err) { 
+        alert('No se ha podido cargar: JSON inválido.');
+        setImportStatus({ type:'err', msg:'JSON inválido' });
+        e.target.value='';
+        return; 
+      }
+      if(!isExportPayload(parsed)) { 
+        const reason = explainInvalid(parsed);
+        alert('No se ha podido cargar: estructura inválida' + (reason? ` (${reason})` : ''));
+        setImportStatus({ type:'err', msg: reason? reason : 'Estructura inválida' });
+        e.target.value='';
+        return; 
+      }
+  // OK: importar (no guardar en historial según requerimiento)
+      importJSON(parsed);
+      setImportStatus({ type:'ok', msg:'Importación completada' });
+      // Permite volver a seleccionar el mismo archivo más tarde
+      e.target.value='';
+    });
   }
 
   return (
@@ -58,9 +82,14 @@ export const App: React.FC = () => {
           <button onClick={()=>setShowExport(true)} disabled={!validation.valid} className="primary-btn">Guardar</button>
           <label className="primary-btn file-btn" style={{cursor:'pointer'}}>
             Cargar
-            <input type="file" accept="application/json" style={{display:'none'}} onChange={handleImport} />
+            <input type="file" accept=".json,application/json" style={{display:'none'}} onChange={handleImport} />
           </label>
           <button className="primary-btn secondary" onClick={()=>{ if(confirm('¿Desea borrar los cambios? No se podrán recuperar.')) reset(); }}>Reiniciar</button>
+          {importStatus && (
+            <div style={{fontSize:11, marginTop:6, width:'100%', color: importStatus.type==='ok'? '#4ade80':'#f87171'}} role="status">
+              {importStatus.msg}
+            </div>
+          )}
         </div>
       </aside>
       <div className="sidebar-footer" style={{position:'fixed',bottom:8,left:16,right:16,display:'flex',justifyContent:'space-between',alignItems:'flex-end',width:268}}>

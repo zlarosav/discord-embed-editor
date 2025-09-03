@@ -1,17 +1,9 @@
 import { EmbedData } from '../state/embedStore';
+import { EMBED_LIMITS as LIMITS } from '../constants/embedLimits';
 
 export interface ValidationResult { valid: boolean; errors: string[]; counts: Record<string, { used: number; limit: number }>; total: { used: number; limit: number }; }
 
-const LIMITS = {
-  title: 256,
-  description: 4096,
-  field_name: 256,
-  field_value: 1024,
-  fields: 25,
-  footer_text: 2048,
-  author_name: 256,
-  total: 6000
-};
+// (Límites centralizados en constants/embedLimits.ts)
 
 export function validateEmbed(e: EmbedData): ValidationResult {
   const errors: string[] = [];

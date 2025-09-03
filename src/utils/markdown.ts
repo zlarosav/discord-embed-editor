@@ -1,7 +1,19 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
 import twemoji from '@twemoji/api';
-import fullSet from '../data/emojis-full.json';
+// Carga diferida del dataset completo para reducir el bundle inicial.
+// Se importa dinámicamente sólo al primer render que requiera emojis.
+let emojiLoadPromise: Promise<any> | null = null;
+let emojiDataCache: any = null;
+async function ensureEmojiData(){
+  if(emojiDataCache) return emojiDataCache;
+  if(!emojiLoadPromise){
+    emojiLoadPromise = import('../data/emojis-full.json')
+      .then(m=>{ emojiDataCache = m.default; return emojiDataCache; })
+      .catch(e=>{ console.warn('[emoji] fallo al cargar dataset', e); return null; });
+  }
+  return emojiLoadPromise;
+}
 
 // Configuración extendida para estilo Discord.
 marked.setOptions({ breaks: true, gfm: true });
@@ -64,35 +76,83 @@ marked.use({ renderer, extensions: [underlineExtension] });
 
 // Construir alias a partir del dataset (cada emoji tiene names[] donde el primero es primario)
 interface FullCat { emojis: { name:string; char:string; names?:string[]; hasDiversity?:boolean; diversity?: { tone:number; char:string; names?:string[] }[] }[] }
-const cats = (fullSet as any).categories as FullCat[];
+// Estructuras perezosas (se rellenan una sola vez)
 const EMOJI_PRIMARY: Record<string,string> = {}; // alias -> primary
-const EMOJI_CHAR: Record<string,string> = {}; // primary -> char
-try {
-  for(const c of cats){
-    for(const e of c.emojis){
-      if(!EMOJI_CHAR[e.name]) EMOJI_CHAR[e.name] = e.char;
-      const list = e.names && e.names.length ? e.names : [e.name];
-      const primary = list[0];
-      // aliases base
-      for(const alias of list){ EMOJI_PRIMARY[alias] = primary; }
-      // variantes de tono
-      if(e.hasDiversity && Array.isArray(e.diversity)){
-        for(const v of e.diversity){
-          if(!v?.char) continue;
-          const vNames = v.names || [];
+const EMOJI_CHAR: Record<string,string> = {}; // primary/alias -> char
+export const EMOJI_ALIAS_MAP = EMOJI_PRIMARY;
+export const EMOJI_ALIAS_INVERSE: Record<string,string> = {};
+let emojiInit = false;
+let emojiLoadScheduled = false;
+const EMOJI_DATASET_FLAG = 'emojiDatasetLoaded';
+const hadLoadedBefore = typeof window !== 'undefined' && (()=>{ try { return !!localStorage.getItem(EMOJI_DATASET_FLAG); } catch { return false; } })();
+
+// Conjunto mínimo embebido (frecuentes + usados en tests) para respuesta inmediata sin inflar bundle.
+// Formato: [primary, char, aliases[]]
+const PRELOAD: Array<[string,string,string[]?]> = [
+  ['green_circle','🟢',['greencircle']],
+  ['heart','❤️',['red_heart','love']],
+  ['smile','😄',['smiley','happy']],
+  ['innocent','😇',['halo']]
+];
+for(const [primary,char,aliases] of PRELOAD){
+  if(!EMOJI_CHAR[primary]) EMOJI_CHAR[primary] = char;
+  EMOJI_PRIMARY[primary] = primary;
+  for(const al of (aliases||[])){
+    EMOJI_PRIMARY[al] = primary;
+    if(!EMOJI_CHAR[al]) EMOJI_CHAR[al] = char;
+  }
+  if(!EMOJI_ALIAS_INVERSE[primary]) EMOJI_ALIAS_INVERSE[primary] = primary;
+}
+async function initEmojiMaps(){
+  if(emojiInit) return;
+  let data: any = null;
+  try { if(performance?.mark) performance.mark('emoji-dataset-load-start'); } catch {}
+  data = await ensureEmojiData();
+  try { if(performance?.mark){ performance.mark('emoji-dataset-load-end'); performance.measure('emoji-dataset-load','emoji-dataset-load-start','emoji-dataset-load-end'); } } catch {}
+  if(!data) { emojiInit = true; return; }
+  try {
+    const cats = data.categories as FullCat[];
+    for(const c of cats){
+      for(const e of c.emojis){
+        if(!EMOJI_CHAR[e.name]) EMOJI_CHAR[e.name] = e.char;
+        const list = e.names && e.names.length ? e.names : [e.name];
+        const primary = list[0];
+        for(const alias of list){ EMOJI_PRIMARY[alias] = primary; }
+        if(e.hasDiversity && Array.isArray(e.diversity)){
+          for(const v of e.diversity){
+            if(!v?.char) continue;
+            const vNames = v.names || [];
             for(const vn of vNames){
-              EMOJI_PRIMARY[vn] = primary; // mapear alias variante al primario
-              if(!EMOJI_CHAR[vn]) EMOJI_CHAR[vn] = v.char; // registrar char específico para alias de tono
+              EMOJI_PRIMARY[vn] = primary;
+              if(!EMOJI_CHAR[vn]) EMOJI_CHAR[vn] = v.char;
             }
+          }
         }
       }
     }
+    for(const [alias, primary] of Object.entries(EMOJI_PRIMARY)){
+      if(!EMOJI_ALIAS_INVERSE[primary]) EMOJI_ALIAS_INVERSE[primary] = primary;
+    }
+  } catch(e){ console.warn('[emoji] init error', e); }
+  emojiInit = true;
+  // Persistir bandera para próximas sesiones
+  try { if(typeof localStorage !== 'undefined') localStorage.setItem(EMOJI_DATASET_FLAG,'1'); } catch {}
+}
+
+function scheduleFullEmojiLoad(){
+  if(emojiInit || emojiLoadScheduled) return;
+  emojiLoadScheduled = true;
+  const runner = ()=>{ initEmojiMaps(); };
+  // Si ya se cargó en una sesión previa, priorizar carga temprana.
+  if(hadLoadedBefore){
+    setTimeout(runner,0);
+    return;
   }
-} catch {}
-export const EMOJI_ALIAS_MAP = EMOJI_PRIMARY; // alias -> primary
-export const EMOJI_ALIAS_INVERSE: Record<string,string> = {}; // primary-> preferred alias (primary itself)
-for(const [alias, primary] of Object.entries(EMOJI_PRIMARY)){
-  if(!EMOJI_ALIAS_INVERSE[primary]) EMOJI_ALIAS_INVERSE[primary] = primary;
+  if(typeof (globalThis as any).requestIdleCallback === 'function'){
+    (globalThis as any).requestIdleCallback(runner, { timeout: 2000 });
+  } else {
+    setTimeout(runner, 50);
+  }
 }
 
 export function renderDiscordMarkdown(raw: string, opts?: { disableEmojis?: boolean }): string {
@@ -101,18 +161,77 @@ export function renderDiscordMarkdown(raw: string, opts?: { disableEmojis?: bool
   // Construir diccionario de nombre -> char (dataset completo generado en build)
   const manualEmoji: Record<string,string> = EMOJI_CHAR; // primary o alias->char
   function resolvePrimary(name:string){ return EMOJI_PRIMARY[name] || (manualEmoji[name]? name : undefined); }
-  // Reemplazo de shortcodes de emoji :nombre: -> unicode. Se preserva el texto original si no se encuentra.
-  // Sólo reemplazamos cuando está rodeado por límites que evitan URLs (evitar ://). Patrón simple.
-  const withEmojis = opts?.disableEmojis ? trimmedRaw : trimmedRaw.replace(/:([a-z0-9_+-]{2,}):/gi, (m, name) => {
+  // Si aún no inicializamos, disparar (sin await) la carga para futuras llamadas.
+  if(!emojiInit && !opts?.disableEmojis){ scheduleFullEmojiLoad(); }
+  // Parser de emojis con retroceso y dos pasadas
+  let withEmojis: string = trimmedRaw;
+  if(!opts?.disableEmojis){
+    const src = trimmedRaw;
+    let acc = '';
+    let i = 0;
+    while(i < src.length){
+      if(src[i] !== ':'){ acc += src[i++]; continue; }
+      const positions: number[] = [];
+      for(let j=i+1;j<src.length && positions.length<25;j++) if(src[j] === ':') positions.push(j);
+      if(!positions.length){ acc += ':'; i++; continue; }
+      let matched = false;
+      let firstClose = positions[0];
+      for(const end of positions){
+        const candidate = src.slice(i+1,end);
+        if(/^[a-z0-9_+-]{2,}$/i.test(candidate)){
+          const key = candidate.toLowerCase();
+          const primary = resolvePrimary(key);
+          if(primary){
+            const chosen = manualEmoji[key] || manualEmoji[primary];
+            if(chosen){
+              acc += `<span class=\"d-emoji\" data-name=\"${primary}\">${chosen}</span>`;
+              i = end + 1;
+              matched = true;
+              break;
+            }
+          }
+        }
+      }
+      if(!matched){
+        // Lookahead: intentar emoji válido inmediatamente después del token inválido
+        // Intentar solapamiento: el ':' de cierre podría ser inicio de siguiente emoji válido
+        let after = src.slice(firstClose); // incluye ':' de cierre previo
+        let overlapped = true; // asumimos intento solapado
+        let m2 = /^:([a-z0-9_+-]{2,}):/i.exec(after);
+        if(!m2){
+          // No había solapamiento real; avanzar uno y volver a intentar
+            after = src.slice(firstClose+1);
+            overlapped = false;
+            m2 = /^:([a-z0-9_+-]{2,}):/i.exec(after);
+        }
+        if(m2){
+          const key2 = m2[1].toLowerCase();
+          const primary2 = resolvePrimary(key2);
+            if(primary2){
+              const chosen2 = manualEmoji[key2] || manualEmoji[primary2];
+              if(chosen2){
+                acc += src.slice(i, firstClose+1); // token inválido intacto (incluye ':')
+                acc += `<span class=\"d-emoji\" data-name=\"${primary2}\">${chosen2}</span>`;
+                // Si hubo solapamiento (after inicia en firstClose) consumimos todo el match excepto el ':' inicial ya emitido.
+                i = firstClose + (overlapped ? m2[0].length : 1 + m2[0].length);
+                continue;
+              }
+            }
+        }
+        acc += src.slice(i, firstClose+1);
+        i = firstClose + 1;
+      }
+    }
+    withEmojis = acc.replace(/:([a-z0-9_+-]{2,}):/gi, (m,name)=>{
       const key = name.toLowerCase();
       const primary = resolvePrimary(key);
       if(primary){
-        // Si el alias exacto tiene char (variante de tono) úsalo, si no el primario base
         const chosen = manualEmoji[key] || manualEmoji[primary];
-        if(chosen) return `<span class="d-emoji" data-name="${primary}">${chosen}</span>`;
+        if(chosen) return `<span class=\"d-emoji\" data-name=\"${primary}\">${chosen}</span>`;
       }
       return m;
     });
+  }
   const lines = withEmojis.split(/\n/);
   const out: string[] = [];
   let inCode = false;

@@ -1,9 +1,14 @@
 import React, { useLayoutEffect, useRef } from 'react';
-import { useEmbedStore, DEFAULT_ICON_URL, DEFAULT_IMAGE_URL } from '../state/embedStore';
+import { useEmbedStore } from '../state/embedStore';
 import { PropertyPopup } from './PropertyPopup';
 import { validateEmbed } from '../utils/validation';
-import { EditableBlock } from './EditableBlock';
 import { FieldList } from './FieldList';
+import { EmbedHeaderBlocks } from './embed/EmbedHeaderBlocks';
+import { EmbedMediaBlocks } from './embed/EmbedMediaBlocks';
+import { EmbedImageBlock } from './embed/EmbedImageBlock';
+import { EmbedFooterBlock } from './embed/EmbedFooterBlock';
+import { intToHex } from '../utils/format';
+import { useOutsideClick } from '../hooks/useOutsideClick';
 
 type PopupType = 'author'|'title'|'footer'|'image'|'thumbnail'|'timestamp'|null;
 
@@ -11,6 +16,8 @@ export const EmbedCanvas: React.FC = () => {
   const embed = useEmbedStore(s => s.embed);
   const update = useEmbedStore(s => s.updateEmbed);
   const [showPicker, setShowPicker] = React.useState(false);
+  const colorRef = React.useRef<HTMLDivElement|null>(null);
+  useOutsideClick(colorRef, ()=> setShowPicker(false), { enabled: showPicker });
   const [popup, setPopup] = React.useState<PopupType>(null);
   const validation = validateEmbed(embed);
   function exceed(key: string, limit: number){ return key.length>limit; }
@@ -51,115 +58,61 @@ export const EmbedCanvas: React.FC = () => {
     }
   }
 
-  const avatarPresets = [ { label: 'Ninguno', value: '' } ];
-  const [authorIconPicker, setAuthorIconPicker] = React.useState(false);
-  const [footerIconPicker, setFooterIconPicker] = React.useState(false);
+  const avatarPresets = [ { label: 'Ninguno', value: '' } ]; // (placeholder para futura funcionalidad)
   return (
   <div ref={cardRef} className={"embed-card" + (narrow? ' embed-narrow':'')} aria-label="Vista previa del embed">
-      <div className="embed-color-bar" onClick={()=>setShowPicker(v=>!v)} style={{background: embed.color? intToHex(embed.color): '#5865f2', position:'relative'}} aria-label="Cambiar color">
-        {showPicker && <div className="color-pop" onClick={e=>e.stopPropagation()}>
-          <input type="color" value={intToHex(embed.color || 0x5865f2)} onChange={e=>update({ color: parseInt(e.target.value.replace('#',''),16) })} />
-          <button onClick={()=>setShowPicker(false)}>Cerrar</button>
-        </div>}
+      <div className="embed-color-bar" ref={colorRef} onClick={()=>setShowPicker(v=>!v)} style={{background: embed.color? intToHex(embed.color): '#5865f2', position:'relative'}} aria-label="Cambiar color" role="button" tabIndex={0}
+        onKeyDown={e=>{ if(e.key==='Enter' || e.key===' '){ e.preventDefault(); setShowPicker(v=>!v); } }}>
+        {showPicker && (
+          <div className="color-pop enhanced" role="dialog" aria-label="Selector de color" onClick={e=>e.stopPropagation()}>
+            <div className="color-pop-header">
+              <strong>Color del Embed</strong>
+              <button className="popup-btn ghost sm" onClick={()=>setShowPicker(false)} aria-label="Cerrar selector">✕</button>
+            </div>
+            <div className="color-pop-body">
+              <div className="color-preview" style={{background:intToHex(embed.color||0x5865f2)}} />
+              <input
+                aria-label="Elegir color"
+                type="color"
+                value={intToHex(embed.color || 0x5865f2)}
+                onChange={e=>update({ color: parseInt(e.target.value.replace('#',''),16) })}
+              />
+              <input
+                aria-label="Valor hexadecimal"
+                className="hex-input"
+                value={intToHex(embed.color || 0x5865f2)}
+                onChange={e=>{
+                  const v = e.target.value.replace(/[^#0-9a-fA-F]/g,'').slice(0,7);
+                  if(/^#[0-9a-fA-F]{6}$/.test(v)){ update({ color: parseInt(v.slice(1),16) }); }
+                  e.target.value = v;
+                }}
+              />
+              <div className="color-presets" aria-label="Presets">
+                {['#5865f2','#2b2d31','#57f287','#fee75c','#ed4245','#eb459e','#00aff4'].map(p => (
+                  <button key={p} type="button" className={"preset" + (intToHex(embed.color||0x5865f2)===p? ' active':'')} style={{background:p}} aria-label={`Preset ${p}`} onClick={()=>update({ color: parseInt(p.slice(1),16) })} />
+                ))}
+              </div>
+            </div>
+            <div className="color-pop-footer">
+              <button className="popup-btn" onClick={()=>setShowPicker(false)}>Hecho</button>
+            </div>
+          </div>
+        )}
       </div>
   <div className={"embed-inner" + (embed.thumbnail? ' has-thumbnail':'')}>
         <div className="embed-layout-row">
           <div className="embed-body">
-            {embed.author && (
-              <div className="block-wrapper" style={embed.author?.name && embed.author.name.length>256? {borderColor:'#ff5f56'}: undefined}>
-                <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('author'); }}>✕</button>
-                <button className="block-remove block-link-edit" style={{right:30}} title="Editar enlace/icono" onClick={(e)=>{ e.stopPropagation(); setPopup('author'); }}>🔗</button>
-                <div className="embed-author">
-                  {embed.author.icon_url && <img src={embed.author.icon_url} alt="author" />}
-                  <EditableBlock value={embed.author?.name} linkUrl={embed.author?.url} onChange={v=>update({ author: { ...(embed.author||{}), name: v } })} placeholder="Author name" charLimit={256} disableLinkNavigation suppressLinkStyle editOnSingleClick />
-                </div>
-              </div>
-            )}
-      {embed.title !== undefined && (
-              <div className="block-wrapper" style={embed.title && embed.title.length>256? {borderColor:'#ff5f56'}: undefined}>
-                <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('title'); }}>✕</button>
-                <button className="block-remove block-link-edit" style={{right:30}} title="Editar enlace" onClick={(e)=>{ e.stopPropagation(); setPopup('title'); }}>🔗</button>
-                <div className="embed-title">
-        <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation editOnSingleClick showEmojiButton />
-                </div>
-              </div>
-            )}
-            {embed.description !== undefined && (
-              <div className="block-wrapper desc-block" style={embed.description && embed.description.length>4096? {borderColor:'#ff5f56'}: undefined}>
-                <button className="block-remove" onClick={()=>remove('description')}>✕</button>
-                <div className="embed-description">
-        <EditableBlock value={embed.description} onChange={v=>update({ description: v })} placeholder="Description" multiline charLimit={4096} showEmojiButton />
-                </div>
-              </div>
-            )}
+            <EmbedHeaderBlocks onRemove={remove} onPopup={setPopup} />
             <FieldList />
           </div>
-          {embed.thumbnail && (
-            <div className="thumb-block" onClick={(e)=>{ e.stopPropagation(); setPopup('thumbnail'); }} onDoubleClick={(e)=>{ e.stopPropagation(); if(embed.thumbnail?.url){ window.open(embed.thumbnail.url,'_blank'); } }}>
-              <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('thumbnail'); }}>✕</button>
-              <img src={embed.thumbnail.url || DEFAULT_ICON_URL} alt="thumbnail" />
-            </div>
-          )}
+          <EmbedMediaBlocks onRemove={remove} onPopup={setPopup} />
         </div>
-        {/* Bloques de ancho completo por debajo de la fila con thumbnail */}
-        {embed.image && (
-          <div className="block-wrapper embed-image image-holder" role="group" aria-label="Imagen" onClick={()=>setPopup('image')} onDoubleClick={(e)=>{ e.stopPropagation(); if(embed.image?.url){ window.open(embed.image.url,'_blank'); } }}>
-            <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('image'); }}>✕</button>
-            <img src={embed.image.url || DEFAULT_IMAGE_URL} alt="image" />
-            {embed.image.url && <ImageHint id="image-hint" url={embed.image.url} />}
-          </div>
-        )}
-        {(embed.footer || embed.timestamp) && (
-          <div className="block-wrapper" style={embed.footer?.text && embed.footer.text.length>2048? {borderColor:'#ff5f56'}: undefined}>
-            <button className="block-remove" onClick={(e)=>{ e.stopPropagation();
-              // Regla: si hay timestamp pero no texto => eliminar footer completo (timestamp incluido)
-              if(embed.timestamp && (!embed.footer?.text || embed.footer.text.trim()==='')){
-                update({ footer: undefined, timestamp: undefined });
-              } else {
-                remove('footer');
-              }
-            }}>✕</button>
-            <button className="block-remove block-link-edit" style={{right:30}} title="Editar icono" onClick={(e)=>{ e.stopPropagation(); setPopup('footer'); }}>🔗</button>
-            <div className="embed-footer">
-              {embed.footer?.icon_url && <img src={embed.footer.icon_url} alt="footer icon" />}
-              <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4,minWidth:0}}>
-                <div style={{flex: (embed.footer?.text && embed.footer.text.trim().length>10)? '1 1 auto':'0 0 auto', maxWidth:'100%'}}>
-                  <EditableBlock value={embed.footer?.text} onChange={v=>{
-                    if(v.trim()==='' && !embed.timestamp){ update({ footer: undefined }); return; }
-                    update({ footer: { ...(embed.footer||{}), text: v } });
-                  }} placeholder="Footer" charLimit={2048} editOnSingleClick />
-                </div>
-                {embed.timestamp && <span onClick={(e)=>{ e.stopPropagation(); setPopup('timestamp'); }} style={{cursor:'pointer'}} title="Editar timestamp">• {new Date(embed.timestamp).toLocaleDateString([], {day:'2-digit', month:'2-digit', year:'numeric'})}</span>}
-                {embed.timestamp && <button className="block-remove" style={{position:'static'}} onClick={()=>{
-                  if(!embed.footer?.text || embed.footer.text.trim()===''){
-                    update({ footer: undefined, timestamp: undefined });
-                  } else {
-                    update({ timestamp: undefined });
-                  }
-                }}>✕</button>}
-              </div>
-            </div>
-          </div>
-        )}
+  <EmbedImageBlock onRemove={remove} onPopup={setPopup} />
+  <EmbedFooterBlock onRemove={remove} onPopup={setPopup} />
       </div>
       {popup && <PropertyPopup type={popup} avatarPresets={avatarPresets} embed={embed} onClose={()=>setPopup(null)} onUpdate={update} />}
     </div>
   );
 };
 
-function intToHex(n: number){ return '#' + n.toString(16).padStart(6,'0'); }
-
-interface ImageHintProps { id: string; url: string; small?: boolean; }
-const MAX_HINT_LENGTH = 120; // evitar mensajes largos
-const sizeRegex = /(\b|_)(\d{2,4})x(\d{2,4})(\b|_)/i;
-const querySizeRegex = /[?&](width|height|size)=([0-9]{2,4})/i;
-const weightRegex = /(\d+(?:\.\d+)?)(kb|mb)/i;
-const ImageHint: React.FC<ImageHintProps> = ({ id, url, small }) => {
-  const lower = url.toLowerCase();
-  let notes: string[] = [];
-  if(sizeRegex.test(lower) || querySizeRegex.test(lower)) notes.push('Dimensiones incluidas');
-  if(weightRegex.test(lower)) notes.push('Tamaño estimado indicado');
-  const text = notes.join(' · ');
-  if(!text) return null;
-  return <div id={id} style={{fontSize:small?9:10,color:'#bbb',marginTop:4}}>{text.slice(0,MAX_HINT_LENGTH)}</div>;
-};
+// ImageHint removido en refactor; reintroducir si se requiere feedback de metadatos.

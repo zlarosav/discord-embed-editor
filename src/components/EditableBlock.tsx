@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { renderDiscordMarkdown, enhanceEmojiImages } from '../utils/markdown';
 import { EmojiPicker } from './EmojiPicker';
+import { useOutsideClick } from '../hooks/useOutsideClick';
+import { handleEditorShortcut } from '../utils/shortcuts';
 
 interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; editOnSingleClick?: boolean; showEmojiButton?: boolean; }
 
@@ -21,59 +23,40 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     }
   }, [draft, editing, multiline]);
 
-  function finish(confirm: boolean) {
+  const finish = useCallback((confirm: boolean) => {
     if(confirm) onChange(draft);
     else setDraft(value || '');
     setEditing(false);
-  }
+  }, [draft, onChange, value]);
 
-  function surround(wrap: string){
+  const surround = useCallback((wrap: string) => {
     if(!ref.current) return;
     const start = (ref.current as any).selectionStart ?? 0;
     const end = (ref.current as any).selectionEnd ?? 0;
     const before = draft.slice(0,start);
     const selected = draft.slice(start,end);
     const after = draft.slice(end);
+    // Caso especial para bloque de código placeholder '```\n'
+    if(wrap==='```\n'){
+      const updatedBlock = `\n\n\u0060\u0060\u0060\n${draft}\n\u0060\u0060\u0060\n`;
+      setDraft(updatedBlock);
+      return;
+    }
     const updated = before + wrap + selected + wrap + after;
     setDraft(updated);
     setTimeout(()=>{ if(ref.current){ (ref.current as any).selectionStart = start+wrap.length; (ref.current as any).selectionEnd = end+wrap.length;} },0);
-  }
-  function handleKey(e: React.KeyboardEvent) {
-    if(e.key==='Escape'){ finish(false); }
-    if(multiline && e.key==='Enter' && e.shiftKey){ // newline normal
-      return; // permitir salto
-    }
-    if(!multiline && e.key==='Enter'){ e.preventDefault(); finish(true); }
-    if(multiline && e.key==='Enter' && !e.shiftKey && !e.metaKey && !e.ctrlKey){ e.preventDefault(); finish(true); }
-    if(multiline && e.key==='Enter' && (e.metaKey || e.ctrlKey)){ e.preventDefault(); finish(true); }
-    if((e.metaKey||e.ctrlKey) && !e.shiftKey){
-  if(e.key.toLowerCase()==='b'){ e.preventDefault(); surround('**'); }
-  if(e.key.toLowerCase()==='i'){ e.preventDefault(); surround('*'); }
-  if(e.key.toLowerCase()==='u'){ e.preventDefault(); surround('__'); }
-  if(e.key.toLowerCase()==='e'){ e.preventDefault(); surround('`'); } // inline code
-  if(e.key.toLowerCase()==='s'){ e.preventDefault(); surround('||'); } // spoiler
-    }
-    // Bloque de código: Ctrl+Shift+C
-    if((e.metaKey||e.ctrlKey) && e.shiftKey && e.key.toLowerCase()==='c'){
-      e.preventDefault();
-      setDraft(d=>`\n\n\
-\`\`\`\n${d}\n\`\`\`\n`);
-    }
-  }
+  }, [draft]);
+
+  const handleKey = useCallback((e: React.KeyboardEvent) => {
+    handleEditorShortcut(e, { surround, finalize: ()=>finish(true) }, { multiline });
+  }, [surround, finish, multiline]);
 
   const remaining = charLimit? (draft.length + '/' + charLimit) : undefined;
 
   // Guardar automáticamente al hacer clic fuera
-  useEffect(()=>{
-    if(!editing) return;
-    function outside(e: MouseEvent){
-      if(wrapperRef.current && !wrapperRef.current.contains(e.target as Node)){
-        finish(true);
-      }
-    }
-    document.addEventListener('mousedown', outside);
-    return ()=>document.removeEventListener('mousedown', outside);
-  }, [editing, draft]);
+  useOutsideClick(wrapperRef, (e)=>{
+    if(editing){ finish(true); }
+  }, { enabled: editing });
 
   // Cuando se cierra la edición, mantener el flag un breve tiempo para evitar que el clic que cierra abra popup
   useEffect(()=>{
