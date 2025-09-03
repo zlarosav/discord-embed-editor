@@ -1,5 +1,7 @@
 import { marked } from 'marked';
 import hljs from 'highlight.js';
+import twemoji from '@twemoji/api';
+import fullSet from '../data/emojis-full.json';
 
 // Configuración extendida para estilo Discord.
 marked.setOptions({ breaks: true, gfm: true });
@@ -60,10 +62,58 @@ const underlineExtension = {
 
 marked.use({ renderer, extensions: [underlineExtension] });
 
-export function renderDiscordMarkdown(raw: string): string {
+// Construir alias a partir del dataset (cada emoji tiene names[] donde el primero es primario)
+interface FullCat { emojis: { name:string; char:string; names?:string[]; hasDiversity?:boolean; diversity?: { tone:number; char:string; names?:string[] }[] }[] }
+const cats = (fullSet as any).categories as FullCat[];
+const EMOJI_PRIMARY: Record<string,string> = {}; // alias -> primary
+const EMOJI_CHAR: Record<string,string> = {}; // primary -> char
+try {
+  for(const c of cats){
+    for(const e of c.emojis){
+      if(!EMOJI_CHAR[e.name]) EMOJI_CHAR[e.name] = e.char;
+      const list = e.names && e.names.length ? e.names : [e.name];
+      const primary = list[0];
+      // aliases base
+      for(const alias of list){ EMOJI_PRIMARY[alias] = primary; }
+      // variantes de tono
+      if(e.hasDiversity && Array.isArray(e.diversity)){
+        for(const v of e.diversity){
+          if(!v?.char) continue;
+          const vNames = v.names || [];
+            for(const vn of vNames){
+              EMOJI_PRIMARY[vn] = primary; // mapear alias variante al primario
+              if(!EMOJI_CHAR[vn]) EMOJI_CHAR[vn] = v.char; // registrar char específico para alias de tono
+            }
+        }
+      }
+    }
+  }
+} catch {}
+export const EMOJI_ALIAS_MAP = EMOJI_PRIMARY; // alias -> primary
+export const EMOJI_ALIAS_INVERSE: Record<string,string> = {}; // primary-> preferred alias (primary itself)
+for(const [alias, primary] of Object.entries(EMOJI_PRIMARY)){
+  if(!EMOJI_ALIAS_INVERSE[primary]) EMOJI_ALIAS_INVERSE[primary] = primary;
+}
+
+export function renderDiscordMarkdown(raw: string, opts?: { disableEmojis?: boolean }): string {
   // Recortar sólo líneas completamente vacías al inicio y final para evitar padding extra
   const trimmedRaw = raw.replace(/^[\n\r]+|[\n\r]+$/g,'');
-  const lines = trimmedRaw.split(/\n/);
+  // Construir diccionario de nombre -> char (dataset completo generado en build)
+  const manualEmoji: Record<string,string> = EMOJI_CHAR; // primary o alias->char
+  function resolvePrimary(name:string){ return EMOJI_PRIMARY[name] || (manualEmoji[name]? name : undefined); }
+  // Reemplazo de shortcodes de emoji :nombre: -> unicode. Se preserva el texto original si no se encuentra.
+  // Sólo reemplazamos cuando está rodeado por límites que evitan URLs (evitar ://). Patrón simple.
+  const withEmojis = opts?.disableEmojis ? trimmedRaw : trimmedRaw.replace(/:([a-z0-9_+-]{2,}):/gi, (m, name) => {
+      const key = name.toLowerCase();
+      const primary = resolvePrimary(key);
+      if(primary){
+        // Si el alias exacto tiene char (variante de tono) úsalo, si no el primario base
+        const chosen = manualEmoji[key] || manualEmoji[primary];
+        if(chosen) return `<span class="d-emoji" data-name="${primary}">${chosen}</span>`;
+      }
+      return m;
+    });
+  const lines = withEmojis.split(/\n/);
   const out: string[] = [];
   let inCode = false;
   let inQuoteRun = false;
@@ -155,4 +205,17 @@ export function renderDiscordMarkdown(raw: string): string {
     return pieces.join('');
   });
   return finalHtml;
+}
+
+// Hook para convertir los emojis unicode dentro de los spans generados a imágenes Twemoji al momento de inyectar en el DOM.
+// Exportamos helper para aplicar después del dangerouslySetInnerHTML.
+export function enhanceEmojiImages(container: HTMLElement){
+  const spans = Array.from(container.querySelectorAll('span.d-emoji')) as HTMLSpanElement[];
+  spans.forEach(span=>{
+    if(span.getAttribute('data-img-ready')==='true') return; // ya procesado
+    const txt = span.textContent||'';
+    if(!txt) return;
+    const parsed = twemoji.parse(txt, { folder:'svg', ext:'.svg', className:'d-emoji-img', base: 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/' });
+    if(parsed && parsed !== txt){ span.innerHTML = parsed; span.setAttribute('data-img-ready','true'); }
+  });
 }

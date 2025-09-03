@@ -39,7 +39,15 @@ export const EmbedCanvas: React.FC = () => {
       case 'footer': update({ footer: undefined }); break;
       case 'thumbnail': update({ thumbnail: undefined }); break;
       case 'image': update({ image: undefined }); break;
-      case 'timestamp': update({ timestamp: undefined }); break;
+      case 'timestamp': {
+        // Si no hay texto en footer, eliminar footer completo también
+        if(!embed.footer?.text || embed.footer.text.trim()===''){
+          update({ footer: undefined, timestamp: undefined });
+        } else {
+          update({ timestamp: undefined });
+        }
+        break;
+      }
     }
   }
 
@@ -67,12 +75,12 @@ export const EmbedCanvas: React.FC = () => {
                 </div>
               </div>
             )}
-            {embed.title !== undefined && (
+      {embed.title !== undefined && (
               <div className="block-wrapper" style={embed.title && embed.title.length>256? {borderColor:'#ff5f56'}: undefined}>
                 <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('title'); }}>✕</button>
                 <button className="block-remove block-link-edit" style={{right:30}} title="Editar enlace" onClick={(e)=>{ e.stopPropagation(); setPopup('title'); }}>🔗</button>
                 <div className="embed-title">
-                  <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation editOnSingleClick />
+        <EditableBlock value={embed.title} linkUrl={embed.url} onChange={v=>update({ title: v })} placeholder="Title" charLimit={256} disableLinkNavigation editOnSingleClick showEmojiButton />
                 </div>
               </div>
             )}
@@ -80,7 +88,7 @@ export const EmbedCanvas: React.FC = () => {
               <div className="block-wrapper desc-block" style={embed.description && embed.description.length>4096? {borderColor:'#ff5f56'}: undefined}>
                 <button className="block-remove" onClick={()=>remove('description')}>✕</button>
                 <div className="embed-description">
-                  <EditableBlock value={embed.description} onChange={v=>update({ description: v })} placeholder="Description" multiline charLimit={4096} />
+        <EditableBlock value={embed.description} onChange={v=>update({ description: v })} placeholder="Description" multiline charLimit={4096} showEmojiButton />
                 </div>
               </div>
             )}
@@ -101,15 +109,35 @@ export const EmbedCanvas: React.FC = () => {
             {embed.image.url && <ImageHint id="image-hint" url={embed.image.url} />}
           </div>
         )}
-        {embed.footer && (
+        {(embed.footer || embed.timestamp) && (
           <div className="block-wrapper" style={embed.footer?.text && embed.footer.text.length>2048? {borderColor:'#ff5f56'}: undefined}>
-            <button className="block-remove" onClick={(e)=>{ e.stopPropagation(); remove('footer'); }}>✕</button>
+            <button className="block-remove" onClick={(e)=>{ e.stopPropagation();
+              // Regla: si hay timestamp pero no texto => eliminar footer completo (timestamp incluido)
+              if(embed.timestamp && (!embed.footer?.text || embed.footer.text.trim()==='')){
+                update({ footer: undefined, timestamp: undefined });
+              } else {
+                remove('footer');
+              }
+            }}>✕</button>
             <button className="block-remove block-link-edit" style={{right:30}} title="Editar icono" onClick={(e)=>{ e.stopPropagation(); setPopup('footer'); }}>🔗</button>
             <div className="embed-footer">
-              {embed.footer.icon_url && <img src={embed.footer.icon_url} alt="footer icon" />}
-              <EditableBlock value={embed.footer?.text} onChange={v=>update({ footer: { ...(embed.footer||{}), text: v } })} placeholder="Footer" charLimit={2048} editOnSingleClick />
-              {embed.timestamp && <span onClick={(e)=>{ e.stopPropagation(); setPopup('timestamp'); }} style={{cursor:'pointer'}} title="Editar timestamp">• {new Date(embed.timestamp).toLocaleDateString([], {day:'2-digit', month:'2-digit', year:'numeric'})}</span>}
-              {embed.timestamp && <button className="block-remove" style={{position:'static'}} onClick={()=>remove('timestamp')}>✕</button>}
+              {embed.footer?.icon_url && <img src={embed.footer.icon_url} alt="footer icon" />}
+              <div style={{display:'flex',alignItems:'center',flexWrap:'wrap',gap:4,minWidth:0}}>
+                <div style={{flex: (embed.footer?.text && embed.footer.text.trim().length>10)? '1 1 auto':'0 0 auto', maxWidth:'100%'}}>
+                  <EditableBlock value={embed.footer?.text} onChange={v=>{
+                    if(v.trim()==='' && !embed.timestamp){ update({ footer: undefined }); return; }
+                    update({ footer: { ...(embed.footer||{}), text: v } });
+                  }} placeholder="Footer" charLimit={2048} editOnSingleClick />
+                </div>
+                {embed.timestamp && <span onClick={(e)=>{ e.stopPropagation(); setPopup('timestamp'); }} style={{cursor:'pointer'}} title="Editar timestamp">• {new Date(embed.timestamp).toLocaleDateString([], {day:'2-digit', month:'2-digit', year:'numeric'})}</span>}
+                {embed.timestamp && <button className="block-remove" style={{position:'static'}} onClick={()=>{
+                  if(!embed.footer?.text || embed.footer.text.trim()===''){
+                    update({ footer: undefined, timestamp: undefined });
+                  } else {
+                    update({ timestamp: undefined });
+                  }
+                }}>✕</button>}
+              </div>
             </div>
           </div>
         )}

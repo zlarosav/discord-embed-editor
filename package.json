@@ -3,17 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "test": "vitest run",
-    "test:ui": "vitest"
-  },
+  
   "dependencies": {
     "clsx": "^2.1.1",
     "highlight.js": "^11.11.1",
     "marked": "^12.0.2",
+    "node-emoji": "^2.2.0",
+    "@twemoji/api": "^16.0.1",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "zustand": "^4.5.2"
@@ -29,6 +25,15 @@
     "jsdom": "^26.1.0",
     "typescript": "^5.5.4",
     "vite": "^5.3.4",
-    "vitest": "^1.6.0"
+    "vitest": "^1.6.0",
+  "unicode-emoji-json": "^0.8.0"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:ui": "vitest",
+  "build:emojis": "node scripts/build-emojis.mjs"
   }
 }

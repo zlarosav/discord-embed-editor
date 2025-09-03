@@ -1,0 +1,22 @@
+[
+  { "name": "grinning", "char": "\uD83D\uDE00", "keywords": ["smile","happy"] },
+  { "name": "smiley", "char": "\uD83D\uDE03", "keywords": ["smile","happy"] },
+  { "name": "smile", "char": "\uD83D\uDE04", "keywords": ["smile","happy"] },
+  { "name": "grin", "char": "\uD83D\uDE01", "keywords": ["grin"] },
+  { "name": "wink", "char": "\uD83D\uDE09", "keywords": ["wink"] },
+  { "name": "blush", "char": "\uD83D\uDE0A", "keywords": ["smile"] },
+  { "name": "thinking", "char": "\uD83E\uDD14", "keywords": ["thinking","hmm"] },
+  { "name": "green_circle", "char": "\uD83D\uDFE2", "keywords": ["status","online"] },
+  { "name": "yellow_circle", "char": "\uD83D\uDFE1", "keywords": ["idle"] },
+  { "name": "red_circle", "char": "\uD83D\uDD34", "keywords": ["record"] },
+  { "name": "white_check_mark", "char": "\u2705", "keywords": ["check","ok"] },
+  { "name": "x", "char": "\u274C", "keywords": ["error"] },
+  { "name": "warning", "char": "\u26A0\uFE0F", "keywords": ["warn"] },
+  { "name": "fire", "char": "\uD83D\uDD25", "keywords": ["hot"] },
+  { "name": "star", "char": "\u2B50", "keywords": ["star"] },
+  { "name": "sparkles", "char": "\u2728", "keywords": ["sparkle"] },
+  { "name": "heart", "char": "\u2764\uFE0F", "keywords": ["love"] },
+  { "name": "thumbsup", "char": "\uD83D\uDC4D", "keywords": ["like","thumbsup","ok"] },
+  { "name": "thumbsdown", "char": "\uD83D\uDC4E", "keywords": ["dislike"] },
+  { "name": "eyes", "char": "\uD83D\uDC40", "keywords": ["eyes","look"] }
+]

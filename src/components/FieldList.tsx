@@ -45,10 +45,10 @@ export const FieldList: React.FC = () => {
                   </div>
                   <div className="field-inner">
                     <div className="field-head">
-                      <EditableBlock value={f.name} onChange={v=>updateField(f.id,{ name: v })} placeholder="Field title" charLimit={256} />
+                      <EditableBlock value={f.name} onChange={v=>updateField(f.id,{ name: v })} placeholder="Field title" charLimit={256} showEmojiButton />
                     </div>
                     <div className="field-value">
-                      <EditableBlock value={f.value} onChange={v=>updateField(f.id,{ value: v })} placeholder="Field value" multiline charLimit={1024} />
+                      <EditableBlock value={f.value} onChange={v=>updateField(f.id,{ value: v })} placeholder="Field value" multiline charLimit={1024} showEmojiButton />
                     </div>
                   </div>
                 </div>

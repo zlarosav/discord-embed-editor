@@ -1,9 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { renderDiscordMarkdown } from '../utils/markdown';
+import { renderDiscordMarkdown, enhanceEmojiImages } from '../utils/markdown';
+import { EmojiPicker } from './EmojiPicker';
 
-interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; editOnSingleClick?: boolean; }
+interface Props { value: string | undefined; onChange: (val: string) => void; placeholder?: string; multiline?: boolean; charLimit?: number; linkUrl?: string; disableLinkNavigation?: boolean; suppressLinkStyle?: boolean; editOnSingleClick?: boolean; showEmojiButton?: boolean; }
 
-export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl, disableLinkNavigation, suppressLinkStyle, editOnSingleClick }) => {
+export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, multiline, charLimit, linkUrl, disableLinkNavigation, suppressLinkStyle, editOnSingleClick, showEmojiButton }) => {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(value || '');
   const ref = useRef<HTMLTextAreaElement | HTMLInputElement | null>(null);
@@ -83,13 +84,56 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     }
   }, [editing, editOnSingleClick]);
 
+  const [showEmoji,setShowEmoji] = useState(false);
+  function insertAtCursor(text: string){
+    if(!ref.current){
+      setDraft(d=>d+text);
+      return;
+    }
+    const el = ref.current as any;
+    const start = el.selectionStart ?? 0;
+    const end = el.selectionEnd ?? start;
+    setDraft(d=>{
+      const next = d.slice(0,start)+text+d.slice(end);
+      return next;
+    });
+    // Recolocar cursor justo después del texto insertado
+    setTimeout(()=>{
+      if(ref.current){
+        const pos = start + text.length;
+        (ref.current as any).selectionStart = pos;
+        (ref.current as any).selectionEnd = pos;
+        (ref.current as any).focus();
+      }
+    },0);
+  }
+
+  // Hooks para modo visual (no edición) deben declararse antes de retornos condicionales
+  const renderedRef = useRef<HTMLDivElement|null>(null);
+  const html = value ? renderDiscordMarkdown(value, { disableEmojis: !showEmojiButton }) : '';
+  useEffect(()=>{
+    if(!editing && renderedRef.current){
+  // Eliminar flags previos para re-procesar (por si quedaron spans sin imagen tras edición)
+  renderedRef.current.querySelectorAll('span.d-emoji').forEach(s=>s.removeAttribute('data-img-ready'));
+  enhanceEmojiImages(renderedRef.current);
+    }
+  }, [html, editing]);
+
   if(editing) {
-    if(multiline) {
-      const longest = draft.split('\n').reduce((m,l)=>Math.max(m,l.length),0);
-      const estWidth = Math.min(375, Math.max(120, longest * 7.2 + 24));
+  if(multiline) {
       return (
-  <div className="editable-wrapper" style={{position:'relative'}} ref={wrapperRef}>
-        <textarea className="auto-resize" style={{width: estWidth}} ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
+  <div className="editable-wrapper" style={{position:'relative', width:'100%'}} ref={wrapperRef}>
+        <div style={{position:'relative',display:'flex',alignItems:'flex-start',gap:6,width:'100%'}}>
+          <textarea className="auto-resize" style={{flex:1,minWidth:260}} ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
+          {showEmojiButton && (
+            <div style={{display:'flex',flexDirection:'column',alignItems:'center',gap:4}}>
+              <button ref={wrapperRef as any} type="button" aria-label="Insertar emoji" style={{background:'#313338',border:'1px solid #3a3c42',borderRadius:6,fontSize:14,padding:'4px 6px',cursor:'pointer'}} onClick={()=>setShowEmoji(s=>!s)}>😊</button>
+              {showEmoji && (
+                <EmojiPicker anchorRef={wrapperRef as any} onClose={()=>setShowEmoji(false)} onSelect={(sc)=>{ insertAtCursor(sc); }} />
+              )}
+            </div>
+          )}
+        </div>
         {remaining && (
           <div style={{position:'absolute',top:-10,right:0,background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,fontSize:11}} aria-hidden="true">
             <span className={'counter ' + (draft.length>(charLimit||Infinity)? 'exceed':'')}>{draft.length}/{charLimit}</span>
@@ -98,8 +142,18 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
       </div>
     ); }
     return (
-  <div className="editable-wrapper" style={{position:'relative'}} ref={wrapperRef}>
-        <input ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
+  <div className="editable-wrapper" style={{position:'relative', width:'100%'}} ref={wrapperRef}>
+        <div style={{display:'flex',alignItems:'center',gap:6,width:'100%'}}>
+          <input style={{flex:1,minWidth:120}} ref={el=>ref.current=el} value={draft} placeholder={placeholder} onChange={e=>setDraft(e.target.value)} onKeyDown={handleKey} />
+          {showEmojiButton && (
+            <>
+              <button ref={wrapperRef as any} type="button" aria-label="Insertar emoji" style={{background:'#313338',border:'1px solid #3a3c42',borderRadius:6,fontSize:14,padding:'4px 6px',cursor:'pointer'}} onClick={()=>setShowEmoji(s=>!s)}>😊</button>
+              {showEmoji && (
+                <EmojiPicker anchorRef={wrapperRef as any} onClose={()=>setShowEmoji(false)} onSelect={(sc)=>{ insertAtCursor(sc); }} />
+              )}
+            </>
+          )}
+        </div>
         {remaining && (
           <div style={{position:'absolute',top:-10,right:0,background:'rgba(0,0,0,.45)',padding:'2px 6px',borderRadius:4,fontSize:11}} aria-hidden="true">
             <span className={'counter ' + (draft.length>(charLimit||Infinity)? 'exceed':'')}>{draft.length}/{charLimit}</span>
@@ -109,7 +163,6 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
     );
   }
 
-  const html = value ? renderDiscordMarkdown(value) : '';
   function handleClick(e: React.MouseEvent){
     const target = e.target as HTMLElement;
     if(target.classList.contains('spoiler')){
@@ -128,7 +181,7 @@ export const EditableBlock: React.FC<Props> = ({ value, onChange, placeholder, m
       }
     }
   }
-  const content = value? <div className="editable" dangerouslySetInnerHTML={{__html: html}} /> : <span style={{opacity:.4}}>{placeholder}</span>;
+  const content = value? <div ref={renderedRef} className="editable" dangerouslySetInnerHTML={{__html: html}} /> : <span style={{opacity:.4}}>{placeholder}</span>;
   function handleLinkClick(e: React.MouseEvent){
     if(disableLinkNavigation && !(e.metaKey||e.ctrlKey)){
       e.preventDefault();
